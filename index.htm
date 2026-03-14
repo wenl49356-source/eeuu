@@ -2,7 +2,13 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- 优化：增加 PWA 全屏与沉浸式沉浸状态栏设置，完美适配 iOS 和 Android -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
     <title>AI Launcher Pro</title>
     <style>
         :root {
@@ -26,12 +32,23 @@
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+        /* 优化：锁死底层视口，采用 100dvh (动态高度) 防止地址栏/软键盘导致挤压或漏白边 */
+        html, body {
+            width: 100%;
+            height: 100%;
+            height: 100dvh; /* 现代浏览器动态高度适配 */
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            position: fixed; /* 彻底防止 iOS 整体滚动和橡皮筋效应 */
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+
         body {
             background-color: var(--bg-color);
             background-size: cover; background-position: center; background-attachment: fixed;
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
             color: var(--text-main);
-            height: 100vh; overflow: hidden;
             display: flex; flex-direction: column;
         }
 
@@ -54,8 +71,16 @@
         .is-charging .battery-level { background: #34C759 !important; }
         #status-network { font-weight: 600; font-size: 13px; margin-right: 2px; }
 
-        /* 页面管理 */
-        .page { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; z-index: 10; overflow-y: auto; padding-bottom: calc(120px + var(--safe-bottom)); background: white; }
+        /* 页面管理优化：让内层完全接管滚动，配合外部的 fixed */
+        .page { 
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+            width: 100%; height: 100%; 
+            display: none; flex-direction: column; z-index: 10; 
+            overflow-y: auto; overflow-x: hidden;
+            -webkit-overflow-scrolling: touch; /* iOS 顺畅滚动支持 */
+            padding-bottom: calc(120px + var(--safe-bottom)); 
+            background: white; 
+        }
         .active { display: flex; }
         #home { background: transparent; }
 
@@ -180,31 +205,35 @@
         .menu-item:last-child { border-bottom: none; }
         .menu-separator { height: 8px; background: #F2F2F7; }
         
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 2000; }
-        .post-modal { background: white; width: 85%; border-radius: 20px; padding: 20px; position: relative; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 2000; }
+        .post-modal { background: white; width: 85%; max-width: 400px; border-radius: 20px; padding: 20px; position: relative; }
 
         /* 方案列表项样式 */
         .scheme-item { padding: 15px; border-bottom: 1px solid #EEE; text-align: center; cursor: pointer; user-select: none; -webkit-user-select: none; font-size: calc(14px * var(--font-scale)); color: #333; }
         .scheme-item:last-child { border-bottom: none; }
         .scheme-item:active { background: #F5F5F5; }
 
-        /* --- 聊天页面修改 --- */
-        .chat-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--kakao-chat-bg); z-index: 500; display: none; flex-direction: column; }
+        /* --- 聊天页面修改，确保使用 flex 和 absolute 定位来撑满 --- */
+        .chat-view { 
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%; background: var(--kakao-chat-bg); z-index: 500; display: none; flex-direction: column; 
+        }
         .chat-view-header { 
             background: var(--kakao-chat-bg); 
             /* 修正顶部：加入动态状态栏高度垫起内容 */
             padding: calc(12px + var(--status-bar-height)) 15px 12px; 
             display: flex; align-items: center; justify-content: space-between; position: relative; 
+            flex-shrink: 0;
         }
         .chat-header-title-container {
-            /* 修正聊天名字标题在绝对居中时也受到状态栏高度影响，由于使用 flex 布局其实不需要强行计算 */
             position: absolute; left: 50%; transform: translateX(-50%); font-size: calc(17px * var(--font-scale)); font-weight: 700; color: #000; pointer-events: none;
-            bottom: 12px; /* 固定在 padding-bottom 的边缘上方 */
+            bottom: 12px; 
         }
         .chat-view-header-icons { display: flex; align-items: center; gap: 15px; }
 
         .chat-view-content { 
-            flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; 
+            flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+            padding: 15px; display: flex; flex-direction: column; gap: 15px; 
             background-color: var(--kakao-chat-bg); background-image: var(--chat-bg-img); background-size: cover; background-position: center;
         }
         .date-bubble { align-self: center; background: rgba(0,0,0,0.15); color: white; padding: 4px 15px; border-radius: 15px; font-size: calc(11px * var(--font-scale)); margin: 10px 0; }
@@ -237,6 +266,8 @@
         .chat-bottom-wrapper {
             background: white;
             padding-bottom: var(--safe-bottom);
+            flex-shrink: 0;
+            width: 100%;
         }
         .chat-input-bar { 
             background: white; 
@@ -613,7 +644,7 @@
 
     <!-- 长按消息触发的操作菜单 -->
     <div id="msg-action-menu" class="modal-overlay">
-        <div style="background: white; width: 75%; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column;">
+        <div style="background: white; width: 75%; max-width: 320px; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column;">
             <div class="menu-item" onclick="actionCopy()" style="text-align:center;">复制</div>
             <div class="menu-item" onclick="actionEdit()" style="text-align:center;">编辑</div>
             <div class="menu-item" onclick="actionQuote()" style="text-align:center;">引用</div>
@@ -1774,6 +1805,12 @@
             document.getElementById('chat-attach-menu').style.display = 'none';
             saveFriends();
             renderMessages();
+            
+            // 发送后自动滚动到底部
+            setTimeout(() => {
+                const container = document.getElementById('chat-content');
+                if (container) container.scrollTop = container.scrollHeight;
+            }, 50);
         }
 
         async function fetchAIResponse(friendIndex) {
@@ -1843,7 +1880,7 @@
                 } else if (m.type === 'photo_mock') {
                     messages.push({ role: apiRole, content: `[用户发送了一张照片，内容描述为：${m.text}]` });
                 } else if (m.type === 'voice') {
-                    messages.push({ role: apiRole, content: `[用户发送了一条语音，内容为：${m.text}]` });
+                    messages.push({ role: apiRole, content: `[用户发送一条语音，内容为：${m.text}]` });
                 } else {
                     messages.push({ role: apiRole, content: m.text });
                 }
@@ -2387,12 +2424,37 @@
             updateNetwork();
         }
 
+        // --- 核心优化：键盘弹出时的视口自适应逻辑 ---
+        function setupKeyboardViewportFix() {
+            // 当输入法弹出改变可视区域时，重新触发滚动到底部，保证输入框不被遮挡
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener("resize", () => {
+                    if (document.getElementById('chat-view').classList.contains('active')) {
+                        const container = document.getElementById('chat-content');
+                        if (container) container.scrollTop = container.scrollHeight;
+                    }
+                });
+            }
+
+            // iOS 的备用防遮挡滚动
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput) {
+                chatInput.addEventListener('focus', () => {
+                    setTimeout(() => {
+                        const container = document.getElementById('chat-content');
+                        if (container) container.scrollTop = container.scrollHeight;
+                    }, 300);
+                });
+            }
+        }
+
         window.onload = () => {
             initStatusBar();
             loadSysSettings();
             applyFontSettings();
             renderCustomFriends();
             renderKakaoPosts();
+            setupKeyboardViewportFix();
             
             const savedAva = localStorage.getItem('img_avatar-img') || '微信图片_20260307234707_22_2.jpg';
             document.getElementById('avatar-img').style.backgroundImage = `url(${savedAva})`;
